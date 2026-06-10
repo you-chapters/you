@@ -15,12 +15,11 @@ This repo contains only `README.md`, `CLAUDE.md`, and per-project implementation
 
 ## Current status
 
-**Phase 1 complete.** Entries are created, stored in DynamoDB, embedded via OpenAI, and upserted into Pinecone. Tags (people, locations, topics, mood, time_markers) are extracted asynchronously and written back to DynamoDB via a DynamoDB Streams Lambda. Semantic search via `/entries/search` is live.
+**Phase 1 complete.** Entries are created, stored in DynamoDB, embedded via OpenAI, and upserted into Pinecone. Tags (people, locations, topics, mood, time_markers) are extracted asynchronously and written back to DynamoDB via a DynamoDB Streams Lambda. Semantic search via `/entries/search` is live. Grounded Q&A via `POST /entries/ask` completes the RAG layer: question is embedded, top-k entries retrieved from Pinecone, sent to gpt-4o-mini with tag metadata as structured context; returns `answer: str` + `sources: list[Entry]`. UI page at `/ask`.
 
 **Phase 2 substantially complete.**
-- `GET /entries/summary` — 7/30-day aggregation of topics, people, mood. Lives on the dashboard as `PeriodStrip` + `PeopleCard`.
+- `GET /entries/summary` — 7/30-day aggregation of topics, people, mood, locations. Lives on the dashboard as `PeriodStrip` + `PeopleCard` + `PlacesCard`.
 - `GET /entries/narrative` — lazy on-demand LLM prose (gpt-4o-mini), cached in the `narratives` DynamoDB table. Dashboard shows `NarrativeStack` (two-deck week + month navigation) for current and previous periods.
-- `PlacesCard` is live in the UI but the API does not yet return `top_locations` in `PeriodSummary` — places will always render empty until the backend is extended (see Known gaps).
 - Stage 2 (EventBridge cron to pre-generate narratives for all users via `handler_narrative.py`) is **not started**.
 - "On this day" is **not started**.
 
@@ -66,6 +65,19 @@ UI: DashboardPage mounts
 
 Staleness rule: current period refreshes if cached record is >24 h old; past periods are frozen on first generation.
 
+**Q&A lifecycle:**
+
+```
+UI: AskPage submits question
+  → POST /entries/ask  { question }
+    → QaService.ask_question(user_id, question)
+      → EntryService.search_entries(user_id, question)  [embed → Pinecone top-k → DynamoDB batch-get]
+      → LLMClient.answer_question(entries, question)    [gpt-4o-mini, strict grounding prompt]
+      → QaResult { answer, sources: [Entry, …] }
+```
+
+The LLM is explicitly instructed to answer only from the provided entries and to admit when information is absent. Each entry is formatted with its extracted tags (topics, people, mood, location) above the prose text — the same structure used in the embedding pipeline — so the LLM has richer signal for questions about mood or people that may not be named explicitly in the text.
+
 **Authentication:** Cognito issues JWTs. API Gateway validates them. The `sub` claim is the `user_id` — it is extracted server-side and never accepted from request bodies. The UI attaches the Cognito ID token as `Authorization: Bearer` on every request.
 
 **Secrets:** stored in AWS SSM Parameter Store (`/you-api/*`). At runtime, `app/config.py` detects SSM paths by a leading `/` and fetches them. Locally, set env vars to raw values.
@@ -84,8 +96,9 @@ Staleness rule: current period refreshes if cached record is >24 h old; past per
 | `POST` | `/entries/search` | Semantic search via Pinecone |
 | `GET` | `/entries/summary` | 7/30-day signal aggregation |
 | `GET` | `/entries/narrative` | LLM prose recap (`?type=week\|month&key=…&refresh=true`) |
+| `POST` | `/entries/ask` | Grounded Q&A — answer from entries only, returns `answer` + `sources` (entry IDs) |
 
-Route ordering matters: `/summary` and `/narrative` must be declared before `/{entry_id}` in the router.
+Route ordering matters: `/search`, `/ask`, `/summary`, and `/narrative` must be declared before `/{entry_id}` in the router.
 
 ---
 
@@ -97,11 +110,12 @@ Route ordering matters: `/summary` and `/narrative` must be declared before `/{e
 - **topics are a controlled vocab:** `work, family, travel, health, reading, finance, relationships, hobbies, food, exercise`. Enforced in the OpenAI system prompt.
 - **Narrative Stage 1 is lazy.** The API generates on first request per period and caches in DynamoDB. Stage 2 (EventBridge pre-generation for all users) is not yet implemented.
 - **NarrativeStack goes beyond the spec.** The UI implements two-deck navigation (current + previous period) with fade transitions rather than the single-card design in the doc.
+- **Q&A is a dedicated service.** `QaService` composes `EntryService` (for retrieval) and `LLMClient` (for generation) rather than embedding Q&A logic into `EntryService`. This keeps `EntryService` focused on CRUD/search and `QaService` independently testable.
+- **Q&A sources are full Entry objects.** `QaResult.sources: list[Entry]` returns the complete entries retrieved from Pinecone. This lets the UI render date, location, and a text preview without a second fetch. Source cards open in a new tab.
 
 ---
 
 ## Known gaps
 
-- **`top_locations` missing from API.** `PlacesCard` in the UI expects `top_locations: LocationCount[]` in the `PeriodSummary` response, but the API's `PeriodSummary` model does not include it. `EntryService.get_summary()` needs a location aggregation pass and a `LocationCount` model. Until then, `PlacesCard` always receives an empty list and renders nothing.
 - **Narrative Stage 2 not started.** `handler_narrative.py` Lambda and EventBridge rules (weekly Sunday 23:55 UTC, monthly 1st 00:05 UTC) are documented in `../you-api/docs/narrative-recap.md` but not implemented.
 - **`embedding_port.py` dead code.** `app/embedding/embedding_port.py` in you-api is a leftover from a refactor and is unused.

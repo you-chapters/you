@@ -23,6 +23,7 @@ Enable natural interaction with personal history:
 - ✅ Store diary entries
 - ✅ Implement semantic search (RAG)
 - ✅ Extract and store signals (topics, people, mood, locations) in DynamoDB + Pinecone
+- ✅ Ask questions about your life — grounded Q&A (gpt-4o-mini answers from retrieved entries only, no invention)
 
 ### Phase 2 — Personal Dashboard (homepage)
 - ✅ **Period summary strip** — mood sparkline + dominant topics + most-mentioned people for last 7/30 days (aggregated from DynamoDB signals, no LLM)
