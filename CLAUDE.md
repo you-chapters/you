@@ -21,13 +21,15 @@ This repo contains only `README.md`, `CLAUDE.md`, and per-project implementation
 - `GET /entries/summary` — 7/30-day aggregation of topics, people, mood, locations. Lives on the dashboard as `PeriodStrip` + `PeopleCard` + `PlacesCard`.
 - `GET /entries/narrative` — lazy on-demand LLM prose (gpt-4o-mini), cached in the `narratives` DynamoDB table. Dashboard shows `NarrativeStack` (two-deck week + month navigation) for current and previous periods.
 - Stage 2 (EventBridge cron to pre-generate narratives for all users via `handler_narrative.py`) is **not started**.
-- "On this day" is **not started**.
+- `GET /entries/on-this-day` — entries from the same month+day in previous years (up to 10 years back), queried via `user_timestamp_index` GSI. Dashboard renders `OnThisDayCard` at the top: hidden when empty, single card or chevron carousel otherwise.
 
 Implementation specs:
 - `../you-api/docs/phase2-dashboard.md`
 - `../you-api/docs/narrative-recap.md`
 - `../you-ui/docs/phase2-dashboard.md`
 - `../you-ui/docs/narrative-recap.md`
+
+**Phase 3 complete.** Timeline segmentation via 7-day sliding windows — topic cosine distance + sustained mood shifts + location bursts → boundaries at 75th-percentile divergence → sparse phase merging → gpt-4o names each phase (2–5 word title + prose description). Phases stored in the `narratives` table under `phase#{uuid}` / `phase_index#latest` sort keys. `YouPhaseFunction` Lambda runs weekly (Monday 01:15 UTC via EventBridge). UI at `/phases`: `PhaseTimeline` (horizontal colored bands) + `PhaseCard` (date range, signals, "Explore entries →" filtered by date range). NavBar link: "Timeline".
 
 ---
 
@@ -97,8 +99,12 @@ The LLM is explicitly instructed to answer only from the provided entries and to
 | `GET` | `/entries/summary` | 7/30-day signal aggregation |
 | `GET` | `/entries/narrative` | LLM prose recap (`?type=week\|month&key=…&refresh=true`) |
 | `POST` | `/entries/ask` | Grounded Q&A — answer from entries only, returns `answer` + `sources` (entry IDs) |
+| `GET` | `/entries/on-this-day` | Entries from same month+day in prior years, newest year first |
+| `GET` | `/phases` | All detected phases (`?refresh=true` to re-run detection) |
+| `GET` | `/phases/current` | The currently open phase (`is_open=true`), or null |
+| `GET` | `/phases/{phase_id}` | Single phase record |
 
-Route ordering matters: `/search`, `/ask`, `/summary`, and `/narrative` must be declared before `/{entry_id}` in the router.
+Route ordering matters: `/search`, `/ask`, `/summary`, `/narrative`, and `/on-this-day` must be declared before `/{entry_id}` in the router.
 
 ---
 
@@ -106,11 +112,13 @@ Route ordering matters: `/search`, `/ask`, `/summary`, and `/narrative` must be 
 
 - **Tags are async-only.** The HTTP API never writes tags. This keeps the create endpoint fast and the tag-extraction pipeline independently deployable.
 - **DynamoDB streams only on the prod table.** `test_entries` has no stream; the embedding Lambda never fires in tests.
-- **`entry_id` is a UUID sort key, not time-ordered.** Time-range queries filter `timestamp` (ISO-8601 string) in Python after fetching all user entries. A GSI on `timestamp` is not yet needed at current scale.
+- **`entry_id` is a UUID sort key, not time-ordered.** Time-range queries filter `timestamp` (ISO-8601 string) in Python after fetching all user entries. A `user_timestamp_index` GSI (PK: `user_id`, SK: `timestamp`) exists on both `entries` and `test_entries` tables; currently used only by `list_by_day` (on-this-day queries). ISO-8601 strings are lexicographically sortable, so `between("2023-03-15", "2023-03-16")` correctly captures all entries on that day regardless of time component.
 - **topics are a controlled vocab:** `work, family, travel, health, reading, finance, relationships, hobbies, food, exercise`. Enforced in the OpenAI system prompt.
 - **Narrative Stage 1 is lazy.** The API generates on first request per period and caches in DynamoDB. Stage 2 (EventBridge pre-generation for all users) is not yet implemented.
 - **NarrativeStack goes beyond the spec.** The UI implements two-deck navigation (current + previous period) with fade transitions rather than the single-card design in the doc.
 - **Q&A is a dedicated service.** `QaService` composes `EntryService` (for retrieval) and `LLMClient` (for generation) rather than embedding Q&A logic into `EntryService`. This keeps `EntryService` focused on CRUD/search and `QaService` independently testable.
+- **Phases share the `narratives` DynamoDB table.** Sort key prefix `phase#` distinguishes phase records from narrative caches (`cache#week#…`, `cache#month#…`). `phase_index#latest` stores the ordered list of phase IDs per user. No separate phases table.
+- **Phase detection is idempotent.** `get_phases(refresh=False)` returns the cached index; `refresh=True` (or the weekly cron) re-runs the full pipeline and overwrites. The `_FREEZE_WEEKS = 4` constant prevents re-naming phases older than 4 weeks.
 - **Q&A sources are full Entry objects.** `QaResult.sources: list[Entry]` returns the complete entries retrieved from Pinecone. This lets the UI render date, location, and a text preview without a second fetch. Source cards open in a new tab.
 
 ---
