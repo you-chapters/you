@@ -127,11 +127,11 @@ Route ordering: `/phases/current` must be declared before `/phases/{phase_id}`.
 Dedicated route `/phases`. NavBar gains "Timeline" link.
 
 **PhasesPage:**
-- Vertical timeline scroll, oldest phase top, current bottom
-- `PhaseCard` per phase: chapter title, date range + entry count, prose description, signal chips (topic pills, mood indicator, top people/locations)
-- Current phase: no end date, "ongoing" indicator, refresh button
+- Horizontal year-band timeline (`PhaseTimeline`): each phase is a coloured band positioned proportionally within the year; year navigation arrows step between years; click a band to select
+- `PhaseCard` detail panel below the timeline: chapter title, date range + entry count, prose description, mood chip (positive / neutral / low) + topic pills + people + location chips, "Explore entries →" link
+- Current phase: no end date, "ongoing" badge, refresh button
 - "Explore entries" link → `/entries?from=YYYY-MM-DD&to=YYYY-MM-DD`
-- Empty state: threshold hint if < 4 weeks of history
+- Empty state: threshold hint if < 3 weeks of history
 
 ---
 

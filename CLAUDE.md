@@ -29,7 +29,7 @@ Implementation specs:
 - `../you-ui/docs/phase2-dashboard.md`
 - `../you-ui/docs/narrative-recap.md`
 
-**Phase 3 complete.** Timeline segmentation via 7-day sliding windows — topic cosine distance + sustained mood shifts + location bursts → boundaries at 75th-percentile divergence → sparse phase merging → gpt-4o names each phase (2–5 word title + prose description). Phases stored in the `narratives` table under `phase#{uuid}` / `phase_index#latest` sort keys. `YouPhaseFunction` Lambda runs weekly (Monday 01:15 UTC via EventBridge). UI at `/phases`: `PhaseTimeline` (horizontal colored bands) + `PhaseCard` (date range, signals, "Explore entries →" filtered by date range). NavBar link: "Timeline".
+**Phase 3 complete.** Timeline segmentation via 7-day sliding windows — topic cosine distance + sustained mood shifts + location bursts → boundaries at 75th-percentile divergence → sparse phase merging → gpt-4o names each phase (2–5 word title + prose description). Phases stored in the `narratives` table under `phase#{uuid}` / `phase_index#latest` sort keys. `YouPhaseFunction` Lambda runs weekly (Monday 01:15 UTC via EventBridge). UI at `/phases`: `PhaseTimeline` (horizontal colored year-band timeline, click to select) + `PhaseCard` (date range, entry count, prose description, mood chip + topic/people/location chips, "Explore entries →" filtered by date range). NavBar link: "Timeline".
 
 ---
 
@@ -108,6 +108,12 @@ Route ordering matters: `/search`, `/ask`, `/summary`, `/narrative`, and `/on-th
 
 ---
 
+## Core product principles
+
+- **Entries are immutable.** Once saved, an entry cannot be edited. This is intentional — YOU is a diary, not a note-taking tool. What was written reflects truth-at-the-time and must not be altered retroactively. Deletion ("tearing out a page") is permitted; mutation is not. Never implement an edit endpoint.
+
+---
+
 ## Key design decisions
 
 - **Tags are async-only.** The HTTP API never writes tags. This keeps the create endpoint fast and the tag-extraction pipeline independently deployable.
@@ -120,6 +126,7 @@ Route ordering matters: `/search`, `/ask`, `/summary`, `/narrative`, and `/on-th
 - **Phases share the `narratives` DynamoDB table.** Sort key prefix `phase#` distinguishes phase records from narrative caches (`cache#week#…`, `cache#month#…`). `phase_index#latest` stores the ordered list of phase IDs per user. No separate phases table.
 - **Phase detection is idempotent.** `get_phases(refresh=False)` returns the cached index; `refresh=True` (or the weekly cron) re-runs the full pipeline and overwrites. The `_FREEZE_WEEKS = 4` constant prevents re-naming phases older than 4 weeks.
 - **Q&A sources are full Entry objects.** `QaResult.sources: list[Entry]` returns the complete entries retrieved from Pinecone. This lets the UI render date, location, and a text preview without a second fetch. Source cards open in a new tab.
+- **PhaseTimeline uses horizontal year-band layout, not vertical scroll.** The spec described a vertical scroll of phase cards. The implementation uses a horizontal band per phase (positioned by percentage within the year, with year navigation arrows) and a single `PhaseCard` detail panel below. This is a deliberate UX choice — all phases for a year are visible at once rather than requiring scroll.
 
 ---
 
