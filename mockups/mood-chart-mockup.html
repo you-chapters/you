@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YOU · Mood Chart — mockup</title>
+<style>
+/* ── design tokens ─────────────────────────────────────── */
+:root {
+  --surface-1:     #fcfcfb;
+  --surface-2:     #f9f9f7;
+  --text-primary:  #0b0b0b;
+  --text-secondary:#52514e;
+  --text-muted:    #898781;
+  --gridline:      #e1e0d9;
+  --baseline:      #c3c2b7;
+  --border:        rgba(11,11,11,0.10);
+
+  --mood-excited:  #1baf7a;
+  --mood-positive: #0ca30c;
+  --mood-mixed:    #eda100;
+  --mood-neutral:  #898781;
+  --mood-anxious:  #ec835a;
+  --mood-negative: #d03b3b;
+
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-1:     #1a1a19;
+    --surface-2:     #0d0d0d;
+    --text-primary:  #ffffff;
+    --text-secondary:#c3c2b7;
+    --text-muted:    #898781;
+    --gridline:      #2c2c2a;
+    --baseline:      #383835;
+    --border:        rgba(255,255,255,0.10);
+
+    --mood-excited:  #199e70;
+    --mood-positive: #0ca30c;
+    --mood-mixed:    #c98500;
+    --mood-neutral:  #898781;
+    --mood-anxious:  #ec835a;
+    --mood-negative: #e66767;
+  }
+}
+
+/* ── reset & base ──────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--surface-2);
+  font-family: var(--font);
+  color: var(--text-primary);
+  padding: 40px 32px;
+  min-height: 100vh;
+}
+
+/* ── placement note ────────────────────────────────────── */
+.placement-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.placement-note span { opacity: 0.5; }
+
+/* ── dashboard shell (context) ─────────────────────────── */
+.dashboard-context {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 860px;
+}
+
+.context-strip {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.context-strip-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.period-toggle {
+  display: flex;
+  gap: 3px;
+}
+.period-btn {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 11px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.period-btn:hover { color: var(--text-primary); }
+.period-btn.active {
+  background: var(--text-primary);
+  color: var(--surface-1);
+  border-color: var(--text-primary);
+}
+
+.context-cards-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.context-card-stub {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+}
+
+/* ── mood card ─────────────────────────────────────────── */
+.mood-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px 14px;
+  position: relative;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── legend ────────────────────────────────────────────── */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── chart area ────────────────────────────────────────── */
+.chart-wrap {
+  position: relative;
+  width: 100%;
+  margin-top: 12px;
+}
+svg.chart {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+/* ── tooltip ───────────────────────────────────────────── */
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+  white-space: nowrap;
+  display: none;
+  z-index: 20;
+}
+.tooltip.visible { display: block; }
+.tt-date  { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.tt-mood  { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-primary); }
+.tt-swatch {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* ── table view ────────────────────────────────────────── */
+details { margin-top: 10px; }
+summary {
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+summary::before { content: '▸'; font-size: 9px; }
+details[open] summary::before { content: '▾'; }
+.data-table {
+  margin-top: 8px;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.data-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--gridline);
+}
+.data-table td {
+  padding: 5px 8px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--gridline);
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.dot-sm { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+</style>
+</head>
+<body>
+
+<p class="placement-note">
+  Dashboard <span>›</span> below PeopleCard / PlacesCard <span>›</span> above NarrativeStack
+</p>
+
+<div class="dashboard-context">
+
+  <!-- simulates PeriodStrip -->
+  <div class="context-strip">
+    <span class="context-strip-label">Period</span>
+    <div class="period-toggle">
+      <button class="period-btn" data-days="7">7 days</button>
+      <button class="period-btn active" data-days="30">30 days</button>
+    </div>
+  </div>
+
+  <!-- simulates PeopleCard | PlacesCard -->
+  <div class="context-cards-row">
+    <div class="context-card-stub">PeopleCard</div>
+    <div class="context-card-stub">PlacesCard</div>
+  </div>
+
+  <!-- MoodCard (the new component) -->
+  <div class="mood-card">
+    <div class="card-header">
+      <span class="card-title">Mood</span>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="chart-wrap" id="chart-wrap">
+      <svg class="chart" id="chart"></svg>
+      <div class="tooltip" id="tooltip">
+        <div class="tt-date" id="tt-date"></div>
+        <div class="tt-mood">
+          <span class="tt-swatch" id="tt-swatch"></span>
+          <span id="tt-mood"></span>
+        </div>
+      </div>
+    </div>
+
+    <details>
+      <summary>Show data table</summary>
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Mood</th></tr></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </details>
+  </div>
+
+</div><!-- /dashboard-context -->
+
+<script>
+// ── sample data ───────────────────────────────────────────────────────────────
+const ALL_DATA = [
+  { date: '2026-04-24', mood: 'positive' },
+  { date: '2026-04-27', mood: 'excited'  },
+  { date: '2026-04-29', mood: 'neutral'  },
+  { date: '2026-05-02', mood: 'anxious'  },
+  { date: '2026-05-04', mood: 'negative' },
+  { date: '2026-05-07', mood: 'anxious'  },
+  { date: '2026-05-09', mood: 'neutral'  },
+  { date: '2026-05-12', mood: 'mixed'    },
+  { date: '2026-05-14', mood: 'positive' },
+  { date: '2026-05-17', mood: 'excited'  },
+  { date: '2026-05-19', mood: 'positive' },
+  { date: '2026-05-21', mood: 'neutral'  },
+  { date: '2026-05-24', mood: 'mixed'    },
+  { date: '2026-05-26', mood: 'anxious'  },
+  { date: '2026-05-28', mood: 'negative' },
+  { date: '2026-05-30', mood: 'neutral'  },
+  { date: '2026-06-01', mood: 'positive' },
+  { date: '2026-06-04', mood: 'excited'  },
+  { date: '2026-06-06', mood: 'positive' },
+  { date: '2026-06-09', mood: 'mixed'    },
+  { date: '2026-06-11', mood: 'neutral'  },
+  { date: '2026-06-13', mood: 'negative' },
+  { date: '2026-06-15', mood: 'anxious'  },
+  { date: '2026-06-17', mood: 'neutral'  },
+  { date: '2026-06-20', mood: 'positive' },
+  { date: '2026-06-22', mood: 'excited'  },
+  { date: '2026-06-24', mood: 'positive' },
+  { date: '2026-06-27', mood: 'positive' },
+];
+
+// Y-position scores (above/below neutral baseline)
+const MOOD_SCORE = {
+  excited:   2.0,
+  positive:  1.4,
+  mixed:     0.4,
+  neutral:   0.0,
+  anxious:  -1.4,
+  negative: -2.0,
+};
+
+const MOOD_VARS = {
+  excited:  '--mood-excited',
+  positive: '--mood-positive',
+  mixed:    '--mood-mixed',
+  neutral:  '--mood-neutral',
+  anxious:  '--mood-anxious',
+  negative: '--mood-negative',
+};
+
+// legend order: best → worst
+const LEGEND_ORDER = ['excited','positive','mixed','neutral','anxious','negative'];
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+function moodColor(mood) { return cssVar(MOOD_VARS[mood] || '--mood-neutral'); }
+
+// ── layout constants ──────────────────────────────────────────────────────────
+const ML = 60, MR = 20, MT = 16, MB = 34; // margins: left, right, top, bottom
+const Y_MIN = -2.4, Y_MAX = 2.4;
+const DOT_R = 5;
+const CHART_H = 180;
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs = {}) {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+  return e;
+}
+
+function fmtDate(str) {
+  const d = new Date(str + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function filterByDays(days) {
+  const anchor = new Date('2026-06-27T00:00:00');
+  const cutoff = new Date(anchor);
+  cutoff.setDate(cutoff.getDate() - days);
+  return ALL_DATA.filter(d => new Date(d.date + 'T00:00:00') >= cutoff);
+}
+
+// ── legend ────────────────────────────────────────────────────────────────────
+function buildLegend() {
+  const container = document.getElementById('legend');
+  container.innerHTML = '';
+  for (const mood of LEGEND_ORDER) {
+    const item = document.createElement('span');
+    item.className = 'legend-item';
+
+    const dot = document.createElement('span');
+    dot.className = 'legend-dot';
+    dot.style.background = moodColor(mood);
+
+    const label = document.createElement('span');
+    label.textContent = mood;
+
+    item.appendChild(dot);
+    item.appendChild(label);
+    container.appendChild(item);
+  }
+}
+
+// ── render chart ──────────────────────────────────────────────────────────────
+function render(days) {
+  const data = filterByDays(days);
+  const svg = document.getElementById('chart');
+  const wrap = document.getElementById('chart-wrap');
+  svg.innerHTML = '';
+
+  const W = wrap.getBoundingClientRect().width || 800;
+  const H = CHART_H;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('height', H);
+
+  const plotW = W - ML - MR;
+  const plotH = H - MT - MB;
+
+  // coordinate mappers
+  const dates = data.map(d => new Date(d.date + 'T00:00:00').getTime());
+  const tMin = dates[0] ?? 0;
+  const tMax = dates[dates.length - 1] ?? 1;
+  const tRange = tMax - tMin || 1;
+  const xOf = dateStr => ML + ((new Date(dateStr + 'T00:00:00').getTime() - tMin) / tRange) * plotW;
+  const yOf = score  => MT + (1 - (score - Y_MIN) / (Y_MAX - Y_MIN)) * plotH;
+
+  // colors from CSS vars (resolved at render time for dark mode support)
+  const surface  = cssVar('--surface-1');
+  const gridline = cssVar('--gridline');
+  const baseline = cssVar('--baseline');
+  const muted    = cssVar('--text-muted');
+
+  // ── horizontal reference lines ──
+  const yTicks = [
+    { score: 2.0, label: 'Positive' },
+    { score: 0.0, label: 'Neutral'  },
+    { score:-2.0, label: 'Negative' },
+  ];
+  for (const { score, label } of yTicks) {
+    const y = yOf(score);
+    svg.appendChild(el('line', {
+      x1: ML, x2: ML + plotW, y1: y, y2: y,
+      stroke: score === 0 ? baseline : gridline,
+      'stroke-width': score === 0 ? 1.5 : 1,
+    }));
+    const txt = el('text', {
+      x: ML - 8, y: y + 4,
+      'text-anchor': 'end',
+      'font-size': 11,
+      fill: muted,
+      'font-family': 'system-ui, -apple-system, "Segoe UI", sans-serif',
+    });
+    txt.textContent = label;
+    svg.appendChild(txt);
+  }
+
+  if (data.length === 0) return;
+
+  // ── connecting polyline ──
+  const pts = data.map(d => `${xOf(d.date)},${yOf(MOOD_SCORE[d.mood] ?? 0)}`).join(' ');
+  svg.appendChild(el('polyline', {
+    points: pts,
+    fill: 'none',
+    stroke: baseline,
+    'stroke-width': 2,
+    'stroke-linejoin': 'round',
+    'stroke-linecap': 'round',
+  }));
+
+  // ── x-axis date labels (≤6 evenly spaced) ──
+  const step = Math.max(1, Math.floor(data.length / 5));
+  for (let i = 0; i < data.length; i += step) {
+    const x = xOf(data[i].date);
+    const txt = el('text', {
+      x, y: H - 8,
+      'text-anchor': 'middle',
+      'font-size': 11,
+      fill: muted,
+      'font-family': 'system-ui, -apple-system, "Segoe UI", sans-serif',
+    });
+    txt.textContent = fmtDate(data[i].date);
+    svg.appendChild(txt);
+  }
+
+  // ── crosshair line (hidden by default) ──
+  const crosshair = el('line', {
+    x1: 0, x2: 0, y1: MT, y2: MT + plotH,
+    stroke: muted,
+    'stroke-width': 1,
+    'stroke-dasharray': '0', // solid, per spec (no dashed)
+    opacity: 0.5,
+    display: 'none',
+  });
+  svg.appendChild(crosshair);
+
+  // ── dots layer ──
+  const tooltip  = document.getElementById('tooltip');
+  const ttDate   = document.getElementById('tt-date');
+  const ttMoodEl = document.getElementById('tt-mood');
+  const ttSwatch = document.getElementById('tt-swatch');
+
+  for (const d of data) {
+    const x = xOf(d.date);
+    const y = yOf(MOOD_SCORE[d.mood] ?? 0);
+    const color = moodColor(d.mood);
+
+    // 2px surface ring (per marks spec)
+    svg.appendChild(el('circle', { cx: x, cy: y, r: DOT_R + 2, fill: surface }));
+    // filled dot
+    svg.appendChild(el('circle', { cx: x, cy: y, r: DOT_R, fill: color }));
+    // transparent hit area ≥24px
+    const hit = el('circle', { cx: x, cy: y, r: 13, fill: 'transparent', style: 'cursor:default' });
+    svg.appendChild(hit);
+
+    hit.addEventListener('pointerenter', e => {
+      crosshair.setAttribute('x1', x); crosshair.setAttribute('x2', x);
+      crosshair.setAttribute('display', '');
+      ttDate.textContent = fmtDate(d.date);
+      ttMoodEl.textContent = d.mood.charAt(0).toUpperCase() + d.mood.slice(1);
+      ttSwatch.style.background = color;
+      tooltip.classList.add('visible');
+      positionTip(e);
+    });
+    hit.addEventListener('pointermove', positionTip);
+    hit.addEventListener('pointerleave', () => {
+      crosshair.setAttribute('display', 'none');
+      tooltip.classList.remove('visible');
+    });
+  }
+
+  // ── populate table ──
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+  for (const d of [...data].reverse()) {
+    const color = moodColor(d.mood);
+    const tr = document.createElement('tr');
+    const tdDate = document.createElement('td');
+    tdDate.textContent = fmtDate(d.date);
+    const tdMood = document.createElement('td');
+    tdMood.innerHTML = `<span class="badge"><span class="dot-sm" style="background:${color}"></span></span>`;
+    tdMood.querySelector('.badge').appendChild(document.createTextNode(d.mood));
+    tr.appendChild(tdDate);
+    tr.appendChild(tdMood);
+    tbody.appendChild(tr);
+  }
+}
+
+function positionTip(e) {
+  const tooltip = document.getElementById('tooltip');
+  const wrap    = document.getElementById('chart-wrap');
+  const rect    = wrap.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const tw = tooltip.offsetWidth || 140;
+  tooltip.style.left = (x + 14 + tw > rect.width ? x - tw - 8 : x + 14) + 'px';
+  tooltip.style.top  = (y - 40) + 'px';
+}
+
+// ── period toggle ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.period-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    render(parseInt(btn.dataset.days, 10));
+  });
+});
+
+// ── init ──────────────────────────────────────────────────────────────────────
+buildLegend();
+render(30);
+window.addEventListener('resize', () => render(
+  parseInt(document.querySelector('.period-btn.active').dataset.days, 10)
+));
+</script>
+</body>
+</html>
